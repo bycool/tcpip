@@ -1,0 +1,273 @@
+前几章:
+
+1.socket()
+	为了执行网络io，进程必须先创建socket，指定期待的通信协议类型。
+	#include <sys/socket.h>
+	int socket(int family, int type, int protocol);
+	参数:
+		int family   : 协议族
+		int type     : 套接字类型
+		int protocol : 某个协议类型常值，或0.
+
+		family:     	说明
+		AF_INET     	IPv4
+		AF_INET6    	IPv6
+		AF_LOCAL		UNIX域协议
+		AF_ROUTE		路由套接字
+		AF_KEY			密钥套接字
+
+		type:       	说明
+		SOCK_STREAM		字节流套接字
+		SOCK_DGRAM		数据报套接字
+		SOCK_SEQPACKET	有序分组套接字
+		SOCK_RAM		原始套接字
+
+		protocol:		说明
+		IPPROTO_CP		tcp传输协议
+		IPPROTO_UDP		UDP传输协议
+		IPPROTO_SCTP	SCTP传输协议
+
+	返回值:
+		socket函数在成功时返回一个很小的非负证书值，类似文件描述符.
+
+2.connect()
+	TCP客户端用connect函数来建立与TCP服务器的链接。
+	#include <sys/socket.h>
+	int connect(int sockfd, const struct sockaddr* servaddr, socklen_t addrlen);
+	参数：
+		int sockfd                 : 由socket函数返回的套接字描述符。
+		struct sockaddr *servaddr  : 套接字地址结构指针，包含服务器ip地址等信息的地址结构指针
+		socklen_t addrlen          : 套接字地址结构长度
+
+	客户端链接服务器前不需要调用bind函数绑定端口，如果需要的话，内核会确定塬ip地址，并选择一个临时端口作为塬端口.
+
+	如果是TCP套接字，调用connect函数会激发TCP的三次握手过程，而且仅在链接建立成功或出错时才返回：
+	1，若TCP客户端没有收到SYN分节的响应，则返回ETIMEDOUT错误，会尝试在发送两次，并延长等待响应时间。
+	2，若对客户端的SYN的响应是RST（表示复位）,则表明服务器主机在客户端指定的端口没有进程在等待与之链接。
+	3，若客户端发出的SYN在中间的某个路由器引发了"destination unreachable"（目的地不可达）ICMP错误，被认为是"软错误"，客并作为EHOSTUNREACH或ENETUNREACH错误返回给进程。
+
+	struct sockaddr:  <sys/socket.h>
+		struct sockaddr {
+			sa_family_t     sin_family;     //地址族
+			char            sa_data[14];    // 14字节，包含套接字中的目标地址和端口
+		}
+
+	struct sockaddr_in: <netinet/in.h>或<arpa/inet.h>
+		struct sockaddr_in {
+			sa_family_t       sin_family;   //地址族
+			uint16_t          sin_port;     //16位tcp/udp端口号  } 这两项必须是网络字节序
+			struct in_addr    sin_addr;     //32位ip地址         }
+			char              sin_zero[8];  //不使用
+		}
+		struct in_addr {
+			In_addr_ t        s_addr;       //32位IPv4地址
+		}
+
+3.bind()
+	bind()函数把一个本地协议地址赋予一个套接字。 对网际网络协议，IPv4是32位地址，IPv6是128位地址，端口号是16位。
+	#include <sys/socket.h>
+	int bind(int sockfd, const struct sockaddr *myaddr, socklen_t addrlen);
+	参数:
+		int sockfd                : 由socket()函数返回的套接字描述符。
+		struct sockaddr *myaddr   : 指向特定于协议的地址结构的指针。这个参数是sockaddr结构体，结构体保存了本地端口信息。将这些信息交给bind(),bind()还你一个套接字描述符。
+		socklen_t addrlen         : 结构体长度
+	第二三个参数可以指定，也可以不指定。
+	 1.服务器启动时捆绑它们众所周知的端口：如果TCP客户端或者服务器端并未曾调用bind()绑定一个端口，当调用connect或listen时，内核就要为对应的套接字选择一个临时接口，当调用connect或者listen时，内核就要为相应的套接字选择一个临时的接口。
+	 2.进程可以指定一个特定的ip地址捆绑到它的套接字上，不过这个ip地址必须是其所在主机的网络接口之一(多网卡情况把). 如果客户端没有指定网卡，则内核根据外出网络作为塬IP。
+
+4.listen()
+	listen()只在TCP服务器端调用,它做两件事.
+	 1.当socket函数创建一个套接字时，套接字默认是主动套接字，listen把一个未链接的套接字转变成一个被动套接字。指示内核接受指向该套接字的链接请求。
+	 2.规定内核应该为相应套接字排队的最大链接个数。
+	#include <sys/socket.h>
+	int listen(int sockfd, int backlog)
+	参数:
+		int sockfd
+		int backlog : 内核为任何一个给定的监听套接字维护两个队列。
+						1，为完成连接队列：正在进行三次握手的套接字
+						2，已完成连接队列：已经完成三次握手的套接字
+				当客户的SYN J到达服务器时，服务端TCP在未完成队列创建一个新项，这个项是三次握手的第二个分节，包括SYN K和ACK J+1，它即保存在未完成队列内，也要发送给客户端，
+                如果客户端顺利发来三次握手的第三个分节ACK K+1，那么服务端的新项就从未完成队列移到已完成队列的队尾，等待服务端的进程调用accept()时，就把已完成队列的队头项
+                返回给进程。如果队列为空，进程就进入睡眠，直到TCP在该队列放入一个新项来唤醒它。
+
+		关于backlog:
+			1.两个队列总和是backlog
+			2.backlog的模糊因子：backlog设为10，但可以容纳15个。1.5倍的关系。
+			3.backlog不要设为0，不同版本对0的处理不同。
+			4.当一个客户发来SYN到达时，队列是满的，TCP会忽略该分节，也就是不发RST。等待客户端的重发机制重发SYN。
+
+5.accept()
+	accept()函数由TCP服务器调用，用于从已完成链接队列队头返回一个已完成的链接。如果队列为空，进程进入睡眠。
+	#include <sys/socket.h>
+	int accept(int sockfd, struct sockaddr* cliaddr, socklen_t *addrlen);
+	参数:
+		struct sockaddr *cliaddr   : 用来保存客户端协议地址，是个返回值。
+		socklen_t * addrlen        : 如上结构体的实际长度。
+	如果accept()成功，会返回一个全新的套接字描述符，代表与其链接的可以返回客户端的TCP链接。
+
+	在accept()阻塞时，如果TCP服务器的子进程退出，子进程会发送SIGCHLD信号给父进程。父进程绑定此信号，会执行处理信号函数，则accept()会返回一个EINTER错误，如果父进程不处理这个错误，程序会终止。
+
+	慢系统调用 (slow system call),描述那些可能永远阻塞的系统调用，永远阻塞的系统调用是指调用有可能永远无法返回，多数网络支持函数都属于这一类。
+	使用与慢系统调用的基本规则：当阻塞与某个慢系统调用的一个进程捕获某个信号且相应信号处理函数返回时，该系统调用可能返回一个EINTR错误。编写程序是必须对EINTR错误有所准备。
+
+6.fork()
+	创建子进程
+	#include <unistd.h>
+	pid_t fork(void);
+	fork()调用一次 ，有两次返回：
+		printf("pid: %d, buf: %s\n",getpid(),  buf);
+		1.父进程返回子进程pid
+		2.子进程返回0
+	fork()后，父进程需要知道子进程的pid，只能通过fork的返回值得到，子进程如果想获得自己的pid只需要使用getpid()。
+
+	fork()的两种经典用法：
+		1，一个进程创建一个自身的副本，每个副本都可以在另一个副本执行其它任务的同时处理各自的某个操作，这是网络服务器的典型用法。
+		2，一个进程如果像执行另一个程序，先fork创建自身的副本，副本内调用exec把自身替换成另一个的程序.
+
+	如果子进程先于父进程退出，则子进程将变成僵尸进程，因为它的资源没有被回收。如果此时父进程退出，则僵尸进程会认init做父进程，让init来回收僵尸进程的资源
+	如何避免僵尸进程，在父进程中调用wait()或waitpid()，即可。子进程退出会向父进程发送SIGCHLD信号, 或者在父进程中处理SIGCHLD信号，在处理该信号的函数内调用wait()或waitpid()即可立即回收子进程的资源。
+
+	如果父进程先于子进程退出，则子进程被init进程领养，则init负责回收自己进程资源。
+
+7,wait() waitpid()
+	调用这两个函数来处理已经终止的子进程
+	#include <sys/wait.h>
+	pid_t wait(int* statloc);
+	pid_t waitpid(pid_t pid, int* statloc, int options);
+
+	函数wait, waitpid均返回两个值，已终止子进程的进程id号，和statloc指针返回子进程终止状态。
+	通过statloc和三个宏可以检查终止状态。并识别子进程是：1正常终止，2被信号杀死，3作业控制停止。
+	还有些宏用于获取子进程退出状态，杀死子进程的信号值，或者停止子进程的作业控制信号值。
+
+	如果子进程先于父进程退出，且父进程调用了wait()，则父进程会立即回收子进程资源，避免其变成僵尸进程。
+	如果父进程调用wait()，则父进程会被阻塞在wait()函数，知道有子进程退出，父进程才会继续顺序执行下去。经过测试，wait只需要一个子进程即可解除阻塞状态。
+
+	waitpid(),可以指定子进程
+	参数pid，指定子进程id号，-1表示等待第一个终止的子进程.
+	参数options,附加项，常用的WNOHANG，它告诉内核在没有已终止的子进程时不要阻塞。
+
+	wait()和waitpid()是有区别的:
+		一个服务器，接受到一个客户端的5个链接，所以服务器有5个子进程，当客户端退出，则5个链接同时断开，服务器的5个子进程同时退出，并向父进程发送SIGCHLD。则如果用wait，只有第一个关掉的子进程会被回收。
+	其它子进程变成僵尸进程。所以使用signal()处理SIGCHLD，在处理函数内调用wait()并不能完全防止出现僵尸进程。
+		问题在于5个信号都在处理函数之前发生，而信号处理函数只执行一次。
+		正确的做法是调用waitpid()而不是wait()。在信号处理函数内循环处理信号，使用waitpid()且不阻塞。
+
+8,并发服务器
+	实现并发即在accept()之后，fork()出子进程，由于fork是复制进程自身，所以listen_sock_fd和client_sock_fd在两个进程内是都存在的，所以父进程关闭client_sock_fd，子进程可以关闭listen_sock_fd,这样这两个描述符的计数器就会-1。子进程处理完业务后调用exit()退出。
+
+9.close()
+	通常Unix close()函数是用来关闭套接字，终止tcp链接。
+	#include <unistd.h>
+	int close(int sockfd);
+	描述符引用计数器。close()导致描述符引用技术-1，如果计数器依然大于0，tcp不会引发TCP的四分组链接终端序列。
+	如果执意想终端这个链接，可以使用shutdown()代替close()
+
+10.getsockname()和getpeername()
+	这两个函数或者返回与某个套接字关联的本地协议地址，或者返回与某个套接字关联的外地协议地址。
+	#include <sys/socket.h>
+	int getsockname(int sockfd, struct sockaddr* localaddr, socklen_t *addrlen);
+	int getpeername(int sockfd, struct sockaddr* peeraddr, socklen_t *addrlen);
+	1，在客户端上，connect()返回成功后，getsockname用于返回由内核赋予该链接的本地ip地址和本地端口号。
+	2，在服务端上，以端口0调用bind(告知内核区选择本地开端后号)后，getsockname用于返回由内核赋予的本地端口号。
+
+
+11.服务器进程终止
+	1，正常启动一个TCP服务器和客户端，服务器使用子进程与客户端保持链接。
+	2，杀掉服务器子进程，这会导致服务器向客户端发送一个FIN，而客户端会相应一个ACK发回来。
+	3，SIGCHLD信号发送给服务器父进程，并得到正确的处理
+	4，客户端没发生任何特殊的事，只接受一个FIN，并返回一个ACK。然后阻塞在fget().
+	5，键入新文本，让客户端发送给服务器，此时TCP链接的断开流程已经完成一般。但客户端感知不到。
+	   当客户端是用writen时，客户TCP接着把数据发送诶服务器，TCP允许这样做,因为客户接受的FIN值表示服务器进程关闭了服务器端。
+	   当客户向一个服务器端已经关闭了的套接字发送信息时，服务器TCP会返回一个RST。
+	6，客户进程是看不到这个RST的。
+
+12.SIGPIPE信号
+	当客户端进程向某一个已收到RST的套接字执行写操作，内核会向该进程发送一个SIGPIPE信号，该信号的默认行为是终止进程。进程必须捕获它，避免不情愿的被终止。
+
+
+
+第六章 I/O复用：select和poll函数
+概述:
+	当TCP客户端同时处理标准输入和TCP套接字时，当客户端要输入文本给套接字时，进程阻塞在fgets()这样的函数内，而此时如果TCP套接字发送类似FIN或者其它数据分节时，客户端进程是没办法及时相应的。
+	所以进程需要一种预先告知内核，使得内核一旦发现进程指定的一个或多个IO条件就绪，内核就通知进程，这个功能叫做IO复用。由select和poll函数支持。
+
+	IO复用典型使用场景：
+	1，当客户处理多个描述符(通常是交互式输入和为网络套接字)时，必须使用IO复用。
+	2，一个客户端同时处理多个网络套接字。
+	3，一个TCP服务器既要处理监听套接字，又要处理已链接套接字，一般就要使用IO复用。
+	4，服务器既要处理TCP，又要处理UDP。
+	5，一个服务器要处理多个服务或者多个协议。
+	I/O复用并非只限于网络编程。
+
+ 6.2 I/O模型
+	1，阻塞式I/O
+		阻塞式I/O就是套接字已经准备好了，就等着套接字内来数据，不来数据就一直等着，来数据了在往下执行，不然就已知卡在接受数据的函数内。
+		进程调用recvfrom,其系统调用知道数据报到达且被赋值到应用进程的
+	2，非阻塞式I/O
+		
+
+	3，I/O复用(select和poll)
+
+	4，信号驱动I/O(SIGIO)
+
+	5，异步I/O
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
