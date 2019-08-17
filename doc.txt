@@ -202,22 +202,47 @@
  6.2 I/O模型
 	1，阻塞式I/O
 		阻塞式I/O就是套接字已经准备好了，就等着套接字内来数据，不来数据就一直等着，来数据了在往下执行，不然就已知卡在接受数据的函数内。
-		进程调用recvfrom,其系统调用知道数据报到达且被赋值到应用进程的
+		进程调用recvfrom,其系统调用知道数据报到达且被赋值到应用进程的缓冲区中或者发生错误才返回。从调用recvfrom开始到它返回的整段时间内是被阻塞的。
+
 	2，非阻塞式I/O
-		
+		进程把一个套接字设置成非阻塞是在通知内核：当所请求的I/O操作非得把本进程投入睡眠才完成时，不要把进程投入睡眠，而是返回一个错误。
 
 	3，I/O复用(select和poll)
+		有了I/O复用，可以调用select和poll，阻塞在这两个系统调用中某一个之上，而不是阻塞真正的I/O系统调用上。
+		类似用select监听描述符，当描述符可读时，select返回，在调用recvfrom把数据报复制到应用进程缓冲区。
+		可以理解进程的套接字在内核曾是畅通无阻的，当远端发送数据到本端时，内核的套接字已经把数据接受，此时有select监听着这个套接字，select发现套接字有数据，则退出阻塞返回给进程。进程便得知套接字可读。
 
 	4，信号驱动I/O(SIGIO)
+		使用信号，让内核在描述符就绪时发送SIGIO信号通知进程。
 
 	5，异步I/O
+		暂略
 
+ 6.3 select()
+	该函数允许进程指示内核等待多个事件的任何一个发生，并只在有一个或多个时间发生或经历一段指定的时间后才唤醒它。
+	#include <sys/socket.h>
+	#include <sys/time.h>
+	int select(int maxfdpl, fd_set *readset, fd_set *writeset, fd_set *exceptset, const struct timeval *timeout);
+	参数：
+		struct timeval {
+			long tv_sec;
+			long tv_usec;
+		}
+			1,永远等待下去：NULL；
+			2,等待一个固定时间：设置timeval
+			3,根本不等待：设置timeval = 0;
 
+		fd_set *readset, *writeset, *exceptset:
+			指定进程让内核测试读、写和异常条件的描述符。
+			如何给这3个参数中的每个参数指定一个或多个描述符值? select使用描述符集，通常是一个整数数组。
+			fd_set rset;
+			FD_ZERO(&rset)
+			FD_SET(1, &rset)
+			FD_SET(4, &rset)
+			FD_SET(5, &rset)
 
-
-
-
-
+		maxfdp1参数指定待测试的描述符个数，它们的值是带测试的最大描述符加1
+			比如带测描述符1，4，5，则maxfdp1则是6.
 
 
 
