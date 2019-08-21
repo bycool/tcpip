@@ -22,10 +22,14 @@ again:
 }
 
 void main(int arc, char** argv){
-	int listenfd, connfd;
-	pid_t childpid;
+	int i, maxi, maxfd, listenfd, connfd, sockfd;
+	int nready, client[FD_SETSIZE];
+	ssize_t n;
+	fd_set rset, allset;
 	socklen_t clilen;
 	struct sockaddr_in cliaddr, servaddr;
+	char buf[4096];
+
 	printf("main pid: %d\n", getpid());
 
 	listenfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -39,15 +43,67 @@ void main(int arc, char** argv){
 
 	listen(listenfd, 10);
 
+	maxfd = listenfd;
+	maxi = -1;
+	for(i=0; i<FD_SETSIZE; i++)
+		client[i] = -1;
+
+	FD_ZERO(&allset);
+	FD_SET(listenfd, &allset);
+
+	printf("listenfd: %d\n", listenfd);  //3
+
 	for( ;; ) {
-		clilen = sizeof(cliaddr);
-		connfd = accept(listenfd, (struct sockaddr*)(&cliaddr), &clilen);
-		if((childpid = fork()) == 0){
-			printf("child.pid: %d\n", getpid());
-			close(listenfd);
-			str_echo(connfd);
-			exit(0);
+
+		rset = allset;
+		nready = select(maxfd+1, &rset, NULL,NULL,NULL);
+		printf("nready: %d\n", nready);
+
+		if(FD_ISSET(listenfd, &rset)){  //listenfd是否在rset内
+			clilen = sizeof(cliaddr);
+			connfd = accept(listenfd, (struct sockaddr*)(&cliaddr), &clilen); 
+
+			for(i=0; i<FD_SETSIZE; i++){
+				printf("client[%d] = %d\n", i, client[i]);
+				if(client[i] < 0){
+					client[i] = connfd;
+					break;
+				}
+			}
+
+			if(i==FD_SETSIZE){
+				printf("too many clients\n");
+				return;
+			}
+
+			FD_SET(connfd, &allset);
+			printf("FD_SET(%d, &allset)\n", connfd);
+			if(connfd > maxfd)
+				maxfd = connfd;
+
+			if(i>maxi)
+				maxi = i;
+
+			if(--nready <= 0)
+				continue;
 		}
-		close(connfd);
+
+		for(i=0; i<=maxi; i++){
+			if((sockfd = client[i])<0)
+				continue;
+			printf("sockfd = %d\n", sockfd);
+			if(FD_ISSET(sockfd, &rset)){
+				if( (n = read(sockfd, buf, 4096)) == 0){
+					close(sockfd);
+					FD_CLR(sockfd, &allset);
+					client[i] = -1;
+				}else{
+					write(sockfd, buf, n);
+				}
+
+			if(--nready <= 0)
+				break;
+			}
+		}
 	}
 }
