@@ -244,6 +244,8 @@
 		描述符集内任何与未就绪描述符对应的位返回时均清成0，所以每次重新调用select函数时，需要再次把描述符内所关心的位均置为1.
 		该函数的返回值为跨所有描述符集的已就绪的总位数。如果描述符就绪前定时器到时，那么返回0，返回-1表示出错。
 
+		如果不是listenfd触发select返回，而是connfd触发的，那么不可读的套接字会被select清除，所以可以用FD_ISSET判断套接字是否是可读的。所以如果还需要调用select，需将要监听的fd_set传给select。
+
 		maxfdp1参数指定待测试的描述符个数，它们的值是带测试的最大描述符加1
 			比如带测描述符1，4，5，则maxfdp1则是6.
 
@@ -317,7 +319,26 @@
 		---------------------------------
 	
 
+第七章： 套接字选项
+	有很多方法来获取或设置印象套接字的选项
+	getsockopt(),setsockopt()
+	fcntl():可以把套接字设置为非阻塞式I/O型，信号驱动性I/O型，以及设置套接字属主的POSIX的方法。
+	ioctl()
 
+ 1.getsockopt()，setsockopt()函数
+	#include <sys/socket.h>
+	int getsockopt(int sockfd, int level, int optname, void* optval, socklen_t *optlen);
+	int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
+
+	optval是指向某个变量的指针，setsockopt从optval中取得选项待设置的新值,getsockopt把已获取的选项当前值存放在optval中。optva大小由optlen指定。
+
+	套接字选项粗分为两大基本类型：
+		1，启用或禁止某个特性的二元选项（称为标志选项）。
+		2，取得并返回我们可以设置或检查的特定值的选项。
+	当给这些标志选项调用getsockopt函数时，*optval是一个整数。*optval中返回的值为0表示相应的选项被禁止。不为0表示相应项被启动。
+	setsockopt()函数需要一个不为0的optval值来启动选项，一个为0的*optval来禁止选项。
+
+ 2.套接字状态
 
 
 

@@ -55,7 +55,7 @@ void main(int arc, char** argv){
 
 	for( ;; ) {
 
-		rset = allset;
+		rset = allset;  //allset包含所有accept和listenfd，而rset在select返回前也包含所有的套接字描述符，但select会将集合中不可读的套接字去掉，只保留可读的套接字。
 		nready = select(maxfd+1, &rset, NULL,NULL,NULL);
 		printf("nready: %d\n", nready);
 
@@ -77,7 +77,7 @@ void main(int arc, char** argv){
 			}
 
 			FD_SET(connfd, &allset);
-			printf("FD_SET(%d, &allset)\n", connfd);
+			printf("add FD_SET(%d, &allset)\n", connfd);
 			if(connfd > maxfd)
 				maxfd = connfd;
 
@@ -91,13 +91,16 @@ void main(int arc, char** argv){
 		for(i=0; i<=maxi; i++){
 			if((sockfd = client[i])<0)
 				continue;
-			printf("sockfd = %d\n", sockfd);
+			printf("for {} sockfd = %d\n", sockfd);
 			if(FD_ISSET(sockfd, &rset)){
+				printf("rset set sockfd : %d\n", sockfd);
 				if( (n = read(sockfd, buf, 4096)) == 0){
 					close(sockfd);
 					FD_CLR(sockfd, &allset);
 					client[i] = -1;
+					printf("close(fd) : %d\n", sockfd);
 				}else{
+					printf("write sockfd : %d\n", sockfd);
 					write(sockfd, buf, n);
 				}
 
