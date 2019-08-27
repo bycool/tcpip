@@ -414,10 +414,52 @@
 	路由表操作                       |                    | SIOCxxxRT
 	------------------------------------------------------------------------------------------------------------
 	
+	#include <fcntl.h>
+	int fcntl(int fd, int cmd, ...);
+
+	fcntl开启非阻塞式IO的典型代码“
+	int flags;
+	if((flags=fcntl(fd, F_GETFL, 0) < 0){
+		return ; // err
+	}
+	flags |= O_NONBLOCK;
+	if(fcntl(fd, F_SETFL, flags)
+		return ; /err
+	这样先获得描述符的现有标志，在把非阻塞的标志加进去，在把新标志设置给描述符。保证在原有的描述符特性上只添加非阻塞的性质，而不会删掉之前的特性。
 
 
+第八章 UDP套接字编程
+	UDP是无链接不可靠的数据报协议，非常不同于TCP提供的面向链接的可靠字节流。
+	这里的可靠是因为TCP已经发送过数据SYN确定对端主机的对应端口已经绑定了监听程序，且对端也回馈了本端，两端都知道对方活着，且对方的地址也都晓得。
+	不可靠是因为UDP只知道对方地址和端口，并不知道该地址和端口是否绑定了程序，在这种情况下发送数据，因为对端是否正确，在这种情况下发送数据是不可靠的。
 
+	#include <sys/socket.h>
+	ssize_t recvfrom(int sockfd, void* buff, size_t nbytes, int flags, struct sockaddr* from, socklen_t *addrlen);
+	ssize_t sendto(int sockfd, const void* buff, size_t nbytes, int flags, const struct sockaddr *to, socklen_t *addrlen);
 
+	作为服务端需要bind()端口：
+	bind(sockfd, (struct sockaddr*)(&servaddr), sizeof(servaddr));
+	然后阻塞，等待接受数据，阻塞在recvfrom函数:
+	recvfrom(sockfd, mesg, 4096, 0, pcliaddr, &len);
+	当有udp数据报接收到后，mesg保存数据，pcliaddr保存客户端协议地址。
+	然后掉sendto把mesg在发送给客户端：
+	sendto(sockfd, mesg, n, 0, pcliaddr, len);
+
+	客户端没有bind()端口，也没有connect(),tcp客户端在connect()时内核为客户端分配临时端口，而UDP则在没有bind()时，第一次sendto时给UDP客户端分配一个临时端口。
+
+ 数据报的丢失
+	以回显程序为例：
+	客户端发送一个数据给服务器，服务器接受到数据后在发给客户端，客户端把数据在显示出来。
+	所以客户端先sendto在recvfrom。
+	如果在这个发送过程中，sendto的数据丟了，客户端没有收到任何数据所以也不会返回任何东西，客户端就一直阻塞在recvfrom内。
+	为了防止这种永久阻塞的一般方法是给客户的recvfrom调用一个设置超时。但仅仅给recvfrom设置超时并不是完美的办法。
+	比如，超时返回我们就不知到数据是没到达服务器，还是服务器的应答没到客户端。
+	
+ 验证接受到的响应
+	以上的情况，可以在客户端recvfrom时接受服务器端的协议地址，在和之前sendto时的服务器协议地址对比下是否是相同地址，如果相同就是服务器的应答。
+	这样依然有弊端：服务器有两个ip,而套接字bind()的ip是通配地址，客户发送通过ip1，服务器反馈通过ip2，贼客户端那边依然判断为服务器没有应答。
+
+	
 
 
 
