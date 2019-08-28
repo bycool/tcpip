@@ -12,8 +12,10 @@ void str_echo(int sockfd){
 	char buf[4096];
 
 again:
-	while((n = read(sockfd, buf, 4096)) > 0)
+	while((n = read(sockfd, buf, 4096)) > 0){
+		printf("buf: %s\n", buf);
 		write(sockfd, buf, n);
+	}
 
 	if(n<0 && errno == EINTR)
 		goto again;
@@ -22,6 +24,7 @@ again:
 }
 
 void main(int arc, char** argv){
+	const int on = 1;
 	int listenfd, connfd;
 	pid_t childpid;
 	socklen_t clilen;
@@ -35,7 +38,12 @@ void main(int arc, char** argv){
 	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	servaddr.sin_port = htons(9999);
 
-	bind(listenfd, (struct sockaddr*)(&servaddr), sizeof(servaddr));
+	setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+
+	if( 0 != bind(listenfd, (struct sockaddr*)(&servaddr), sizeof(servaddr))){
+		printf("bind error \n");
+		return;
+	}
 
 	listen(listenfd, 10);
 
