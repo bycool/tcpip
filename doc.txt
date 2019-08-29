@@ -520,14 +520,55 @@
 	MX			MX记录把一个主机指定作为给定主机的“邮件交换器”
 	CNAME		规范名字：它常见用法是为常用服务指派CNAME记录。如果人们使用这些服务名而不是真实的主机名，那么相应的服务挪到另一个主机时，他们不必知道。
 
- 2.2 解析器和名字服务器
+  2.2 解析器和名字服务器
 	gethostbyname:把主机名映射成IPv4地址
 	gethostbyaddr:后者相反。
 	在获取DNS服务的流程中包括：应用程序，解析器，本地DNS，网络DNS。
 	流程：应用程序代码使用通常的函数调用来执行解析器中的代码，调用典型的函数：gethostbyname,gethostbyaddr.
 		  解析器通过读取其系统相关的配置文件确定本组织结构的名字服务器们的所在位置，文件/etc/resolv.conf通常包含本地名字服务器主机的IP地址。例如：nameserver 192.168.0.1
 		  解析器使用UDP像本地名字服务器发送查询，如果本地名字服务器不知道答案，本地名字服务器通常会使用UDP在这个因特网上查询其它名字服务器，如果答案太长，超出UDP承载能力，本地名字服务器和解析其会自动切换TCP。
+
+  2.3 DNS替代方法
+	类似/etc/hosts内填写主机信息
+
+
+ 3 gethostbyname()
+	查找主机名最基本的函数，如果成功返回一个执行hostent结构的指针，该结构包含所查找足迹的所有IPv4地址。这个函数的极限就是只返回IPv4地址。getaddrinfo可以同时处理IPv4和IPv6的地址。
+	#include <netdb.h>
+	struct hostent* gethostbyname(const char* hostname);
+
+ 3 gethostbyaddr()
+	试图由一个二进制的IP地址找到相应的主机名
+	#include <netdb.h>
+	struct hostent *gethostbyaddr(const char* addr, socklen_t len, int family);
+	返回hostent结构体,参数addr实际上不是char*,而是一个指向存放IPv4地址的某个in_addr结构体的指针。
+
+ 4 getservbyname和getseervbyport函数
+	像主机iyang，服务也通常靠名字来容纳值。如果我们的程序代码中通过其名字而不是其端口号来指代一个服务，而从名字到端口号的映射关系保存在一个文件内。即使端口号发生变动，我们修改/etc/service中的某一个行即可
+	#include <netdb.h>
+	struct servent *getservbyname(const char* servname, const char* protoname);
+	返回值类型：
+		struct servent {
+			char*  s_name;
+			char** s_aliases;
+			int    s_port;
+			char*  s_proto;
+		}
+	参数：
+		servname必须指定。
+
+	例子：
+		getservbyname("domain", "udp");  //DNS use udpa
+
 	
+	struct servent *getservbyport(int port, const char* protoname);
+	port参数的值必须是网络字节序。
+	
+
+
+
+
+
 
 
 
