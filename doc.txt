@@ -492,7 +492,42 @@
  1,接口模型
 	SCTP套接字分为1v1和1vN套接字。
 
+ 废话不多说，先把第十章的1vN的例子搬过来。
+	
+第十章
+	redhat 找不到netinet/sctp.h 整章略
 
+第十一章 名字与地址转换
+ 1.概述
+	这章要说DNS：
+	ip和主机名字之间的转换函数：gethostbyname() gethostbyaddr
+	服务器名字和端口进行转换:	getservbyname() getservbyport
+
+ 2.域名系统
+	域名系统(DOMAIN Name System, DNS), 主要用于主机名字与IP地址之间的映射。
+
+  2.1 资源记录
+	举个例子：下面是unpbook.com域中关于主机freebsd的四个DNS记录：
+	freebsd		IN	A		12.106.32.254
+				IN	AAAA	IPv6 address
+				IN	MX		5	freebsd.unpbook.com
+				IN	MAX		10	mailhost.unpbook.com
+
+	DNS中的条目成为资源记录(resource record, RR),介绍几个类型的RR：
+	A           A记录把一个主机名映射成32位IPv4地址。
+	AAAA		四A记录主机名映射成的IPv6地址
+	PTR			称为“指针记录”的PTR记录，它把IP地址映射成主机名。
+	MX			MX记录把一个主机指定作为给定主机的“邮件交换器”
+	CNAME		规范名字：它常见用法是为常用服务指派CNAME记录。如果人们使用这些服务名而不是真实的主机名，那么相应的服务挪到另一个主机时，他们不必知道。
+
+ 2.2 解析器和名字服务器
+	gethostbyname:把主机名映射成IPv4地址
+	gethostbyaddr:后者相反。
+	在获取DNS服务的流程中包括：应用程序，解析器，本地DNS，网络DNS。
+	流程：应用程序代码使用通常的函数调用来执行解析器中的代码，调用典型的函数：gethostbyname,gethostbyaddr.
+		  解析器通过读取其系统相关的配置文件确定本组织结构的名字服务器们的所在位置，文件/etc/resolv.conf通常包含本地名字服务器主机的IP地址。例如：nameserver 192.168.0.1
+		  解析器使用UDP像本地名字服务器发送查询，如果本地名字服务器不知道答案，本地名字服务器通常会使用UDP在这个因特网上查询其它名字服务器，如果答案太长，超出UDP承载能力，本地名字服务器和解析其会自动切换TCP。
+	
 
 
 
