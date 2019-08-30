@@ -533,6 +533,7 @@
 
 
  3 gethostbyname()
+	说明：该函数使用通过hostname得到的主机名称来获得主机的IP地址。
 	查找主机名最基本的函数，如果成功返回一个执行hostent结构的指针，该结构包含所查找足迹的所有IPv4地址。这个函数的极限就是只返回IPv4地址。getaddrinfo可以同时处理IPv4和IPv6的地址。
 	#include <netdb.h>
 	struct hostent* gethostbyname(const char* hostname);
@@ -544,14 +545,15 @@
 	返回hostent结构体,参数addr实际上不是char*,而是一个指向存放IPv4地址的某个in_addr结构体的指针。
 
  4 getservbyname和getseervbyport函数
-	像主机iyang，服务也通常靠名字来容纳值。如果我们的程序代码中通过其名字而不是其端口号来指代一个服务，而从名字到端口号的映射关系保存在一个文件内。即使端口号发生变动，我们修改/etc/service中的某一个行即可
+	像主机一样，服务也通常靠名字来容纳值。如果我们的程序代码中通过其名字而不是其端口号来指代一个服务，而从名字到端口号的映射关系保存在一个文件内。即使端口号发生变动，我们修改/etc/service中的某一个行即可
 	#include <netdb.h>
 	struct servent *getservbyname(const char* servname, const char* protoname);
+	说明：通过服务名称比如daytime，就可获得包含服务端口的结构体
 	返回值类型：
 		struct servent {
 			char*  s_name;
 			char** s_aliases;
-			int    s_port;
+			int    s_port;    //服务端口号。
 			char*  s_proto;
 		}
 	参数：
