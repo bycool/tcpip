@@ -566,7 +566,43 @@
 	struct servent *getservbyport(int port, const char* protoname);
 	port参数的值必须是网络字节序。
 	
+  5 int getaddrinfo(const char* hostname, const char* service, const struct addrinfo *hints, struct addrinfo **result);
+	hints:结构体指针，需要填入期待返回的信息的要求。
+	result: 链表，返回符合要求的地址链表
 
+    例子：
+		struct addrinfo hints, *res;
+		hzero(&hints, sizeof(hints));
+		hints.ai_flags = AI_CANONNAME;
+		hints.ai_family = AF_INET;
+		getaddrinfo("localhost.localdomain", "domain", &hints, &res);
+
+  6 const char *gai_strerror(int errno)
+	getaddrinfo返回的非0值，通过此函数解释错误值。
+
+  7 voidfreeaddrinfo(struct addrinfo* ai)
+	getaddrinfo返回的result链表，通过该函数释放掉。
+
+  8 struct addrinfo* host_serv(const char* hostname, const char* service, int family, int socktype)
+	封装getaddrinfo，指定hints的ai_family和ai_socktype字段。
+
+  9 int tcp_connect(const char* hostname, const char* service)
+	调用getaddrinfo后，将返回的result中的地址进行socket套接字创建和链接，调用connect，链接成功就返回socket。
+
+  10 int tcp_listen(const char* hostname, char* service, socklen_t* addrlenp)
+	调用getaddrinfo后，将返回的result中的地址进行套接字创建，并bind(),bind()成功则返回socket。
+
+  11 int udp_client(const char* hostname, const char* service, struct sockaddr** saptr, socklen_t *lenp)
+	 用getaddrinfo的result地址创建socket，创建成功，返回sockfd，result内地址sockaddr结构体和其长度。
+     int udp_connect(const char* hostname, const char* service)
+	 和上面一样，但不许要返回上面函数后面两个参数，这个是创建sockfd成功且connect成功，返回sockfd。
+	 int udp_server(const char* hostname, const char* service, socklen_t *lenptr)
+	 result内创建套接字sockfd成功，且bind()成功，返回sockfd和地址结构体的长度。
+
+  12 getnameinfo()
+	#include <netdb.h>
+	int getnameinfo(const struct sockaddr* 
+	
 
 
 
