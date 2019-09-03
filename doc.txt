@@ -537,6 +537,13 @@
 	查找主机名最基本的函数，如果成功返回一个执行hostent结构的指针，该结构包含所查找足迹的所有IPv4地址。这个函数的极限就是只返回IPv4地址。getaddrinfo可以同时处理IPv4和IPv6的地址。
 	#include <netdb.h>
 	struct hostent* gethostbyname(const char* hostname);
+	struct hostent {
+		char *h_name;    //正式主机名
+		char **h_aliases;  //主机别名
+		int h_addrtype;   //主机IP地址类型
+		int h_length;    //主机IP地址长度
+		char **h_addr_list; //主机IP地址列表
+	}
 
  3 gethostbyaddr()
 	试图由一个二进制的IP地址找到相应的主机名
@@ -604,6 +611,20 @@
 	int getnameinfo(const struct sockaddr* 
 	
 
+第十二章 IPv4和IPv6的互操做性
+	双栈：双协议栈，一个IPv4协议和一个IPv6协议栈。
+	双栈主机地一个基本特性是其上的IPv6服务器技能处理IPv4客户，又能处理IPv6客户。
+	IPv4的一个TCP分节组成：  以太网首部(0800) | IPv4首部(目标IPv4地址) | TCP首部(目标端口) | TCP数据          0800把本以太网帧标识为IPv4帧
+	IPv6的一个TCP分节组成：  以太网首部(86dd) | IPv6首部(目标IPv6地址) | TCP首部(目标端口) | TCP数据          86dd标记本以太网帧为IPv6帧
+
+    接受数据链路通过查看以太网类型字段把每帧发送给对应的IP模块。当该IPv4帧发送到服务端后，进入服务端的IPv4模块，模块结合帧内信息，检测到服务端是个IPv6套接字，于是把数据报IPv4首部中的塬IPv4地址换成一个等价的IPv4映射的IPv6地址。
+	简单理解，以太网帧可以分辨协议是IPv4还是IPv6，该帧会发送到服务端的对应协议栈内，如果IPv4帧发送到IPv6套接字的服务器内时，协议栈会把IPv4的帧中的IPv4地址改成该地址映射之后的IPv6地址。修改后的帧发送给服务器进程。由accept()负责返回。
+
+	一个IPv4客户端和一个IPv6服务器通信的步骤如下：
+	1.IPv6服务器启动后创建一个IPv6的监听套接字，假定套接字绑定的通配地址。
+	2.IPv4客户端通过gethostbyname找到主机的一个A记录，即服务器的IPv4地址信息。
+	3.客户端调用connect,导致客户端主机发送一个IPv4的SYNC到服务器主机。
+	4.服务器主机接收这个IPv4 SYN，设置一个标志指示本链接应该使用IPv4映射的IPv6地址，然后响应一个IPv4 SYN/ACK。该链接建立后，由accept返给服务器的地址就是这个映射的IPv6地址。
 
 
 
