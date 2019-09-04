@@ -620,11 +620,53 @@
     接受数据链路通过查看以太网类型字段把每帧发送给对应的IP模块。当该IPv4帧发送到服务端后，进入服务端的IPv4模块，模块结合帧内信息，检测到服务端是个IPv6套接字，于是把数据报IPv4首部中的塬IPv4地址换成一个等价的IPv4映射的IPv6地址。
 	简单理解，以太网帧可以分辨协议是IPv4还是IPv6，该帧会发送到服务端的对应协议栈内，如果IPv4帧发送到IPv6套接字的服务器内时，协议栈会把IPv4的帧中的IPv4地址改成该地址映射之后的IPv6地址。修改后的帧发送给服务器进程。由accept()负责返回。
 
-	一个IPv4客户端和一个IPv6服务器通信的步骤如下：
+  1.一个IPv4客户端和一个IPv6服务器通信的步骤如下：
 	1.IPv6服务器启动后创建一个IPv6的监听套接字，假定套接字绑定的通配地址。
 	2.IPv4客户端通过gethostbyname找到主机的一个A记录，即服务器的IPv4地址信息。
 	3.客户端调用connect,导致客户端主机发送一个IPv4的SYNC到服务器主机。
-	4.服务器主机接收这个IPv4 SYN，设置一个标志指示本链接应该使用IPv4映射的IPv6地址，然后响应一个IPv4 SYN/ACK。该链接建立后，由accept返给服务器的地址就是这个映射的IPv6地址。
+	4.服务器主机接收这个IPv4 SYN，设置一个标志指示本链接应该使用IPv4映射的IPv6地址，然后响应一个IPv4 SYN/ACK。该链接建立后，由accept返给服务器的地址就是这个IPv4映射后的IPv6地址。
+	5.服务器向IPv4映射后的IPv6地址发送TCP分节时，服务器的IP栈会将IPv6地址还原为IPv4地址,所以服务器发送给IPv4的数据报是IPv4.所以IPv4客户和IPv6服务器间的通信都是用IPv4的载送数据报。
+	6.对于IPv6服务器，如果它不去明确的检查数据报的IPv6地址是不是由IPv4地址映射，那它就不会知道自己是在和IPv4客户端通信。
+	者中情形需要一个支撑性的假设：双栈服务器主机既有一个IPv4地址，又有一个IPv6地址。
+
+	* IPv4数据报发送到IPv4套接字，不论是UDP还是TCP，都不需要做特殊处理。
+	* IPv6数据报发送到IPv6套接字，不论是UDP还是TCP，不需要特殊处理
+	* 收到目的地为IPv6套接字的IPv4数据报，那么内核需要将这个IPv4数据报的地址映射为IPv6地址，在由accept(TCP)或recvfrom(UDP)将这个IPv6地址返回给。简单理解，你发来4，但我要6，给你的4变一个6，我在看。
+
+	
+  2.IPv6客户与IPv4服务器
+	1.一个IPv4服务器在只支持IPv4的一个主机上启动后创建一个IPv4的监听套接字。
+	2.IPv6客户端调用getaddrinfo只查找IPv6地址，会得到服务器IPv4地址映射成的IPv6地址。
+	3.IPv6客户端会使用得到的服务器IPv4的地址映射称的IPv6地址，进行connect。内核检测到这个映射地址后自动发送一个IPv4 SYN到服务器。
+	4.服务器相应一个IPv4 SYN/ACK，链接通过使用IPv4数据报建立。
+
+	* IPv4 TCP套接字connect IPv4地址 或 IPv4 UDP套接字sendto IPv4地址，无需特殊处理。
+	* IPv6 TCP套接字connect IPv6地址 或 IPv6 UDP套接字sendto IPv6地址，无需特殊处理。
+	* IPv6 TCP套接字connect IPv4映射后的IPv6地址，或IPv6 UDP套接字sentto IPv4映射的IPv6地址，内核检测到这个地址后改发IPv4数据报。简单理解：我是6，你是4，我先查下你的6地址，发现你是4，我就把6信息改成4发你。
+
+
+
+第十四章 高级I/O函数
+ 1.概述
+	本章讨论我们笼统的归为“高级IO”的各个函数和技术。在IO操作上设置超时有三种方法。
+	read和write这两个函数的三个变体：
+		recv和send允许通过第四个参数从进程到内核传递标志
+		readv和writev允许指定往其中输入数据或从其中输出数据的缓冲区响亮。
+		recvmsg和sendmsg结合了其它IO函数的所有特性，并具备接受和发送辅助数据的新能力。
+
+ 2.套接字超时
+	套接字的IO操作上设置超时的三种方法：
+	1.调用alarm,它在指定超时期满时产生SIGALRM信号，这个方法涉及信号处理，而信号处理的不同的实现上存在差异，而且可能干扰进程中现有的alarm调用。
+	2.select中阻塞等待IO(select有内置的时间限制)，以此代替直接阻塞在read或write调用上。
+	3.使用较新的SO_RECTIMEO和SO_SNDTIMEO套接字选项，问题在于并非所有实现都支持这两个套接字选项。
+
+   2.1 使用SIGALRM为connect设置超时
+		sigfunc = signal(SIGALRM, new_func); //设置新的SIGALRM信号处理函数，将就的信号处理函数保存下来
+		if(alarm(nsec)!=0)  //确定是第一次调用
+		connect(sockfd, sapter, salen) //进行链接，如果connect在nsec时间内没有完成链接，
+		alarm(0) //如果链接在nsec秒内成功，则关闭闹钟
+		signal(SIGALRM,sigfunc); //恢复就得信号处理函数
+	大概思想：通过设置定时，在超时处理函数内终止connect链接等待。一般connect超时时长是75s，用alarm只能设置比75s更小的时间，大于的话也只能超时时长为75秒。
 
 
 

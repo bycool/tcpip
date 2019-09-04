@@ -6,6 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <signal.h>
 
 void str_cli(FILE* fp , int sockfd){
 	char sendline[4096], recvline[4096];
