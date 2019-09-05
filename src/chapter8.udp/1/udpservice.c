@@ -16,6 +16,9 @@ void dg_echo(int sockfd, struct sockaddr * pcliaddr, socklen_t clilen){
 	for(;;){
 		len = clilen;
 		n = recvfrom(sockfd, mesg, 4096, 0, pcliaddr, &len);
+		mesg[n] = 0;
+		printf("%s\n", mesg);
+		sleep(8);
 		sendto(sockfd, mesg, n, 0, pcliaddr, len);
 	}
 }

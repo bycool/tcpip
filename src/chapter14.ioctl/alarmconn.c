@@ -49,8 +49,8 @@ void main(int argc, char** argv){
 
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
-	flags = fcntl(sockfd, F_GETFL, 0);
-	fcntl(sockfd, F_SETFL, flags & ~O_NONBLOCK);
+//	flags = fcntl(sockfd, F_GETFL, 0);
+//	fcntl(sockfd, F_SETFL, flags & ~O_NONBLOCK);
 
 	bzero(&servaddr, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
@@ -60,4 +60,5 @@ void main(int argc, char** argv){
 	printf("before connect_timeo\n");
 	connect_timeo(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr), 5);
 	printf("after connect_timeo\n");
+	return;
 }

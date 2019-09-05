@@ -6,6 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #define MAX(A,B) ((A)>(B)?(A):(B))
 
@@ -39,6 +40,7 @@ void str_cli(FILE* fp , int sockfd){
 
 void main(int argc, char** argv){
 	int sockfd;
+	int flags;
 	struct sockaddr_in servaddr;
 
 	if(argc != 2){
@@ -46,14 +48,19 @@ void main(int argc, char** argv){
 		return ;
 	}
 
+
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+	flags = fcntl(sockfd, F_GETFL, 0);
+	fcntl(sockfd, F_SETFL, flags | O_NONBLOCK); //这里虽然把套接字设为非阻塞，但是select函数是阻塞的。read需要等待select检测到服务端有数据过来才会read sockfd。
 
 	bzero(&servaddr, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_port = htons(9999);
 	inet_pton(AF_INET, argv[1], &servaddr.sin_addr);
 
-	connect(sockfd, (struct sockaddr*)(&servaddr), sizeof(servaddr));
+	int n = connect(sockfd, (struct sockaddr*)(&servaddr), sizeof(servaddr));
+	printf("n = %d\n", n);
 
 	str_cli(stdin, sockfd);
 

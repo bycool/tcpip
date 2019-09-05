@@ -13,6 +13,8 @@ void str_echo(int sockfd){
 
 again:
 	while((n = read(sockfd, buf, 4096)) > 0){
+		sleep(2);
+		buf[n] = 0;
 		printf("buf: %s\n", buf);
 		write(sockfd, buf, n);
 	}
