@@ -675,6 +675,91 @@ PS:关于阻塞和非阻塞的一点心得：阻塞和非阻塞的是对文件�
 		signal(SIGALRM,sigfunc); //恢复就得信号处理函数
 	大概思想：通过设置定时，在超时处理函数内终止connect链接等待。一般connect超时时长是75s，用alarm只能设置比75s更小的时间，大于的话也只能超时时长为75秒。
 
+   2.2 select为recvfrom设置超时
+	首先select是自带超时设置参数的，在指定时间内如果没有描述符有变化，就返回0，指定时间内有变化就返回变刷的描述符个数。
+	select返回后就可已读sockfd,recvfrom调用接受数据。
+
+   2.3 SO_RCVTIMEO套接字选项为recvfrom设置超时
+	struct timeval tv;
+	tv.tv_sec = 5;
+	tv.tv_usec = 0;
+	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+ 3 send和recv函数
+	#include <sys/socket.h>
+	ssize_t recv(int sockfd, void *buff, size_t nbytes, int flags);
+	ssize_t send(int sockfd, const void *buff, size_t nbytes, int flags);
+	recv和send的前三个参数和read write一样，最后一个是标志位，可以实现一些功能，如让本次send或recv变成非阻塞的，等待所有数据等行为。
+
+ 4 readv和writev函数
+	#include <sys/uio.h>
+	ssize_t readv(int filedes, const struct iovec *iov, int iovcnt);
+	ssize_t sendv(int filedes, const struct iovec *iov, int iovcnt);
+	struct iovec {
+		void *iov_base;
+		size_t iov_len;
+	}
+	两个函数允许单个系统调用读入或写出自一个或多个缓冲区，这些操作分别称作  分散读，集中写。
+
+  5 recvmsg和sendmsg函数
+	这两个函数是最通用的IO函数，实际上我们是可以把所有的read，readv，recv和recvfrom替换为recvmsg调用。sendmsg同样也可以替换。
+	#include <sys/socket.h>
+	ssize_t recvmsg(int sockfd, struct msghdr* msg, int flags);
+	ssize_t sendmsg(int sockfd, struct msghdr* msg, int flags);
+
+
+
+第十六章 非阻塞式IO
+ps:对于select和accept的组合使用有一种情况：当client与service完成三次握手时，service在调用accept前的这段时间client关闭了socket，导致client发送一个RST给service，此时调用accept会导致accept阻塞，知道有新的链接到来。所以在select之后应该把套接字设为非阻塞。
+ 1，概述
+	套接字的默认状态是阻塞的。这以为着当放生一个不能立即完成的套接字调用时，其进程被投入睡眠，等待相应操作完成。
+	可能阻塞的套接字调用可以分为四类：
+	1，输入操作：如read，readv,recv,recvfrom,recvmsg函数,如果对阻塞套接字调用这些函数，而且该套接字的接受缓冲区没有可读数据，进程将被投入睡眠，知道有一些数据到达。
+	2，输出操作：如write,writev,send,sendto,sendmsg，对于一个TCP套接字，内核将从应用进程的缓冲区到该套接字的缓冲区赋值数据。对于阻塞的套接字，如果其发送发送缓冲区中没有空间，进程被投入睡眠，直到有空间为止。
+	3，接受外来的链接，即accept函数，如果对一个阻塞的套接字调用accept函数，并且尚无新链接到达，进程被投入睡眠。
+	4，发起外出链接，即用TCP的connect函数。因为要三次握手connect需要等待服务端的ACK才返回，以为着connect会阻塞至少一个服务器的RTT时间。
+	   如果对一个非阻塞TCP套接字调用connect，并且链接不恩纳个立即建立，那么链接的建立照样会发起，即客户端发送SYN给服务端，但会返回一个EINPROGRESS错误。这样的链接是可以建立的（connect成功)。
+
+ 2，非阻塞读写：str_cli
+	对于使用select监听stdin和socket这个描述符的情况，会出现如下情况：
+	stdin有数据输入，进程读取，并用writen(sockfd)发送，而sockfd的发送缓冲区已满，writen操作会阻塞，在阻塞期间，socket接受缓冲区可能有数据可读。还有一种情况stdout比网络慢，也会造成类似的阻塞，但阻塞点不同。
+	把套接字和标准输入输出设置为非阻塞的会使代码变得很复杂，
+
+   str_cli简单版本
+	简单版本就是使用fork把当前的进程划分成两个进程
+	这个函数一开始就调用fork把当前进程划分称一个父进程一个子进程。子进程把来自服务器的文本行复制到标准输出，父进程把来自标准输入的文本复制到服务器。
+	void str_cli(FILE* fp, int sockfd){
+		pid_t pid;
+		char sendline[4096], recvline[4096];
+
+		if( (pid=fork())==0){ //child
+			while(readline(sockfd, recvline, 4096)>0)  //sockfd有数据可读，
+				fputs(recvline, stdout);		//删除
+
+			kill(getppid(), SIGTERM); // terminal parent ，，到这里说明sockfd读到了EOF，所以终止父进程，终结，不是正常退出。
+			exit(0);
+		}
+
+		while(fgets(sendline, 4096, fp)!=NULL)  //从标准输入读到数据fgets返回非NULL
+			write(sockfd, sendline, strlen(sendline)); //发送给服务器
+
+		shutdown(sockfd, SHUT_WR);  //执行到此处，说明标准输入没有东西可读了，意味着没有数据向sockfd写了，所以关闭sockfd写。
+		pasuse(); //等待子进程，子进程可能在读sockfd.
+		return;
+	}
+
+ 3，非阻塞connect
+	当一个非阻塞的TCP套接字上调用connect时，connect将立即返回一个EINPROGRESS错误，不过已发起的三次握手继续进行。我们接着使用select检测这个链接或成功或失败的已建立条件。
+	非阻塞connect有三个用途：
+		1，我们可以把三次握手叠加在其它操作上，完成connect要花非一个RTT时间，RTT由局域网的几毫秒到几百毫秒不等，广域网可能上几秒，这段时间可以执行其它操作。
+		2，可以同时建立多个链接。
+		3，既然使用select等待链接的建立，我们可以给select指定一个时间限制，使得我们恩纳个够缩短connect的超时。
+
+	非阻塞connect虽然看起来简单，必须有一些细节要粗里：
+		尽管套接字是非阻塞的，如果链接到的服务器在同一主机上，那么当我们调用connect时，链接通常是立即建立的。
+		关于select和非阻塞的connect的两个规定：1 当链接成功建立时，描述符表为可写。2 当链接建立遇到错误时描述符变为即可读又可写。
+
+ 4，非阻塞accept
 	
 
 
