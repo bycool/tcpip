@@ -12,6 +12,11 @@
 #include <signal.h>
 
 
+void alarm_recv(int signo){
+	printf("alarm_recv\n");
+	return;
+}
+
 void dg_cli(FILE* fp, int sockfd, const struct sockaddr * pservaddr, socklen_t servlen){
 	int n;
 	char sendline[4096], recvline[4096];
@@ -20,10 +25,13 @@ void dg_cli(FILE* fp, int sockfd, const struct sockaddr * pservaddr, socklen_t s
 	socklen_t len;
 	int flags;
 
+	signal(SIGALRM, alarm_recv);
+
 	setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &on, servlen);
 
 	while(fgets(sendline, 4096, fp) != NULL){
 		sendto(sockfd, sendline, strlen(sendline), 0, pservaddr, servlen);
+		alarm(1);
 		for(;;){
 			n = recvfrom(sockfd, recvline, 4096, 0, (struct sockaddr*)(&prelay_addr), &len);
 			if(n<0)
