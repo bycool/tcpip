@@ -64,9 +64,10 @@ void main(int arc, char** argv){
 			connfd = accept(listenfd, (struct sockaddr*)(&cliaddr), &clilen); 
 
 			for(i=0; i<FD_SETSIZE; i++){
-				printf("client[%d] = %d\n", i, client[i]);
+				printf("A:client[%d] = %d\n", i, client[i]);
 				if(client[i] < 0){
 					client[i] = connfd;
+				printf("B:client[%d] = %d\n", i, client[i]);
 					break;
 				}
 			}
@@ -104,8 +105,8 @@ void main(int arc, char** argv){
 					write(sockfd, buf, n);
 				}
 
-			if(--nready <= 0)
-				break;
+				if(--nready <= 0)
+					break;
 			}
 		}
 	}

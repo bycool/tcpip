@@ -14,7 +14,7 @@ void str_cli(FILE* fp , int sockfd){
 	char sendline[4096], recvline[4096];
 	while(fgets(sendline, 4096, fp) != NULL){
 		write(sockfd, sendline, strlen(sendline));
-		if( (n=read(sockfd, recvline, 4096)) == 0){
+/*		if( (n=read(sockfd, recvline, 4096)) == 0){
 			printf("service terminated\n");
 			return;
 		}else if(n<0){
@@ -22,6 +22,7 @@ void str_cli(FILE* fp , int sockfd){
 		}
 		recvline[n] = 0;
 		printf("%s", recvline);
+*/
 	}
 }
 

@@ -15,8 +15,8 @@ again:
 	while((n = read(sockfd, buf, 4096)) > 0){
 		sleep(1);
 		buf[n] = 0;
-		printf("buf: %s\n", buf);
-		write(sockfd, buf, n);
+		printf("src: %s", buf);
+	//	write(sockfd, buf, n);
 	}
 
 	if(n<0 && errno == EINTR)
@@ -38,7 +38,8 @@ void main(int arc, char** argv){
 	bzero(&servaddr, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	servaddr.sin_port = htons(9999);
+//	servaddr.sin_addr.s_addr = htonl("192.168.253.169");
+	servaddr.sin_port = htons(9998);
 
 	setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
 

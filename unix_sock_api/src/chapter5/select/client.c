@@ -34,7 +34,7 @@ void str_cli(FILE* fp , int sockfd){
 				}
 			}
 			buf[n] = 0;
-			printf("%s", buf);
+			printf("return: %s", buf);
 		}
 
 		if(FD_ISSET(fileno(fp), &rset)){
@@ -53,8 +53,8 @@ void main(int argc, char** argv){
 	int sockfd;
 	struct sockaddr_in servaddr;
 
-	if(argc != 2){
-		printf("tcpcli: <ipAddress>");
+	if(argc != 3){
+		printf("tcpcli: <ipAddress> <port>\n");
 		return ;
 	}
 
@@ -62,7 +62,7 @@ void main(int argc, char** argv){
 
 	bzero(&servaddr, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
-	servaddr.sin_port = htons(9999);
+	servaddr.sin_port = htons(atoi(argv[2]));
 	inet_pton(AF_INET, argv[1], &servaddr.sin_addr);
 
 	connect(sockfd, (struct sockaddr*)(&servaddr), sizeof(servaddr));

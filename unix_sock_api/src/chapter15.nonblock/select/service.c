@@ -6,6 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
 
 void str_echo(int sockfd){
 	ssize_t n;
@@ -29,6 +30,8 @@ void main(int arc, char** argv){
 	socklen_t clilen;
 	struct sockaddr_in cliaddr, servaddr;
 	char buf[4096];
+	int flags;
+    struct timeval tval;
 
 	printf("main pid: %d\n", getpid());
 
@@ -48,6 +51,12 @@ void main(int arc, char** argv){
 	for(i=0; i<FD_SETSIZE; i++)
 		client[i] = -1;
 
+    flags = fcntl(sockfd, F_GETFL, 0);
+    fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
+
+	tval.tv_sec = 0;
+	tval.tv_usec = 0;
+
 	FD_ZERO(&allset);
 	FD_SET(listenfd, &allset);
 
@@ -55,8 +64,11 @@ void main(int arc, char** argv){
 
 	for( ;; ) {
 
+		printf("sleep 10...\n");
+		sleep(5);
+
 		rset = allset;  //allset包含所有accept和listenfd，而rset在select返回前也包含所有的套接字描述符，但select会将集合中不可读的套接字去掉，只保留可读的套接字。
-		nready = select(maxfd+1, &rset, NULL,NULL,NULL);
+		nready = select(maxfd+1, &rset, NULL, NULL, &tval);
 		printf("nready: %d\n", nready);
 
 		if(FD_ISSET(listenfd, &rset)){  //listenfd是否在rset内
@@ -108,5 +120,8 @@ void main(int arc, char** argv){
 				break;
 			}
 		}
+
+		
+
 	}
 }
