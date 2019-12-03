@@ -46,8 +46,9 @@
             数据传输：         --> ESTABLISHED.[write()]  ->       seq=x+1,ACK=y+1      ->      ESTABLISHED.[read()] --|
                                    ESTABLISHED            <-         ACK x+2            <-      ESTABLISHED          <-|
             断链接四次挥手：  --> FIN_WAIT_1.[close()]    ->      FIN seq=x+2 ACK=Y+1   ->      CLOSE_WAIT           --|
-                接收到ack后变  |- FIN_WAIT_2              <=         ACK x+3            <=      CLOSE_WAIT           ==| 单独发送ACK后，等服务端可以close时，转变状态，到LAST_ACK
-                成TIME_WAIT    |- TIME_WAIT               <=         FIN seq = y + 1    <=      LAST_ACK.[close()]   ==| 调用close发送给客户端FIN，此时客户端肯定是TIME_WAIT
+                接收到ack后变  -- FIN_WAIT_2              <=         ACK x+3            <=      CLOSE_WAIT           ==| 单独发送ACK后,等待发送FIN，状态没有发生变化
+                成TIME_WAIT    -- TIME_WAIT               <=         FIN seq = y + 1    <=      LAST_ACK.[close()]   ==| 调用close发送给客户端FIN，此时客户端肯定是TIME_WAIT，发送完FIN，服务端变成LAST_WAIT。
+                               |- TIME_WAIT               ->         ACK=y+2            ->       CLOSE
 
 
 
@@ -60,17 +61,79 @@
                             但TCP需要两端都准备好了才可以传输数据，服务端收到客户端的ACK确认之后，服务端进入ESTABLISHED状态，所以两端都进入准备好的状态。
 							ESTABLISHED是一个数据传送状态。
 
+			6, FIN_WAIT_1: 第一次挥手。主动关闭的一方既可以是客户端也可以是服务端，它终止连接时，发送FIN给对方，然后等待对方返回ACK。调用close()第一次挥手就进入此状态。
+			7, CLOSE_WAIT: 接收到FIN之后，被动关闭的一方进入此状态。具体动作是接收到FIN，同时发送ACK，之后等待发送FIN,因为被动关闭一方也需要调用close()来发送FIN给对端。
+			8, FIN_WAIT_2: 主动端先执行主动关闭发送FIN，然后收到被动关闭一端发来的ACK后进入此状态。
+			9, LAST_ACK: 被动关闭的一端发起关闭请求FIN后，由CLOSE_WAIT进入此状态，具体动作是发送FIN给对方，在接收ACK后进入CLOSE状态。
+			10, CLOSING: 两边同时发起关闭请求时(主动方发送FIN，等待被动方返回ACK，同时被动方也发送FIN，主动方接收到FIN后，发送ACK给被动方，也就是后发FIN的一方的FIN不会被忽略？)，主动方会由FIN_WAIT_1进入此状态
+                         等待被动方返回ACK。
+			11, TIME_WAIT: 三种情况:
+					1, 由CLOSING进入：同时发起关闭情况下，当主动端接受到ACK后，进入此状态。同时关闭理解为：都发FIN给对方，且两个FIN之间没有ACK。
+					2, 由FIN_WATI_1进入: 发起关闭后，发送FIN，等待ACK的时候，正好被被动关闭也发起关闭，发送FIN给主动方，此时主动端先接收到了ACK，后接受到了FIN。
+					3，由FIN_WAIT_2进入: 主动方发送FIN后，接收到对端发动的FIN，然后发送ACK给被动方。
 
 
+			
+	2.7 TIME_WATI状态
+
+	2.8 SCTP关联的建立和终止
+
+	2.9 端口号
+		端口号可以用来区别接受信息的进程。
+
+	2.10 TCP端口号与并发服务器
+		
 
 
+第三章：套接字编程简介
+	3.1 概述:
+		本章从地址结构开始讲起，几乎以后的例子都用到。这些结构可以在两个方向上传递：从进程到内核，从内核到进程。
 
+	3.2 套接字地址结构
+		大多数套接字函数都需要一个指向套接字地址结构的指针作为参数。
+	  3.2.1 IPV4套接字地址结构
+		IPV4套接字地址结构通常成为"网际套接字地址结构",它以sockaddr_in命名，定义在<netinet/in.h>头文件中。
+		struct sockaddr_in {
+			uint8_t           sin_len;        // length of structurea  //现在版本没有这个
+			sa_family_t       sin_family;     // AF_INET
+			in_port_t         sin_port;       // 16bit tcp or udp port number,  network byte ordered
+			struct in_addr    sin_addr;       // 32bit IPV4 adddr,  network byte ordered
+			char              sin_zero[8];    // unused
+		}
+		struct in_addr {
+			in_addr_t         s_addr;         // 32bit IPV4 addr,  in_addr_t: uint32_t: 无符号32位整数
+		}
+		
 
+		sockaddr                                               sockaddr_in                                         sockaddr_un
+       |----------------------------|                     |------------------------------|                    |----------------------|
+       |   16位地址类型(2字节)      |                     |  16位地址类型(2字节)AF_INET  |                    | 16位地址类型AF_UNIX  |
+       |----------------------------|                     |------------------------------|                    |----------------------|
+       |   14字节地址数据           |                     |  16位端口号  (2字节)         |                    | 108字节路径名        |
+       |   14*8=112位               |                     |------------------------------|                    \______________________/
+       |                            |                     |  32位IP地址  (4字节)         |
+       |                            |                     |------------------------------|
+       |                            |                     |  64位        8字节填充       |
+       |----------------------------|                     \______________________________/
 
+		sockaddr和sockaddr_in长度是相同的，在传参时是可以相互转换的。
 
+	  3.2.2 通用套接字地址结构
+		struct sockaddr {
+			sa_family_t        sa_family;       // address family; AF_XXX value
+			char               sa_data[14];     // protocol-specific address
+		}
 
+	
+	3.3 值-结果参数
+		1，从进程到内核传递套接字地址结构
+			bind,connect,sendto的一个参数是指向某个套接字地址的置身，冷一个是该结构体的大小。
+			connect(sockfd, (SA*)&serv, sizeof(serv));
+			此类参数是参数传入内核。
+		2，从内核到进程传递套接字地址结构的函数有accept,recvfrom,getsockanme,getpeername.
+			getpeername(unixfd, (SA*)&cli, &len);
 
-
+	3.4
 
 
 
